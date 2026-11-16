@@ -37,6 +37,34 @@
   #dragbar button:hover{background:rgba(255,255,255,.1);color:var(--txt)}
   #dragbar #dbDrag.on{background:var(--accent);border-color:var(--accent);color:#05130a}
   #dragbar #dbClose{border:none;font-size:14px;padding:3px 8px}
+
+  /* ====== MODO WIDGET (ventana individual: solo un diseño, sin la web entera) ====== */
+  body.widgetmode{background:transparent !important;overflow:hidden}
+  body.widgetmode::before{display:none !important}
+  body.widgetmode #dragbar, body.widgetmode header, body.widgetmode .panel,
+  body.widgetmode .stage-label, body.widgetmode .lock{display:none !important}
+  body.widgetmode .wrap{max-width:none;margin:0;padding:0}
+  body.widgetmode .layout{display:block;gap:0}
+  body.widgetmode .stage{background:transparent !important;border:none;min-height:100vh;padding:8px;
+     display:flex;align-items:center;justify-content:center;overflow:visible}
+  body.widgetmode.locked #widgetHost{filter:none;opacity:1;transform:none;pointer-events:auto}
+  body.widgetmode:not(.w-lyrics) .lyrics-card{display:none !important}
+  body.w-lyrics .stage{display:none !important}
+  body.w-lyrics .lyrics-card{margin:0;border:none;border-radius:16px;height:100vh;
+     background:rgba(10,10,15,.72);backdrop-filter:blur(12px)}
+  body.w-lyrics .lyrics-body{max-height:none;height:calc(100vh - 48px)}
+  /* mini-barra flotante que aparece al pasar el ratón */
+  #wtool{display:none}
+  body.widgetmode #wtool{display:flex;position:fixed;top:6px;right:6px;z-index:300;gap:6px;opacity:0;
+     transition:.15s;-webkit-app-region:no-drag}
+  body.widgetmode:hover #wtool{opacity:1}
+  #wtool button{-webkit-app-region:no-drag;background:rgba(10,10,15,.85);border:1px solid var(--line);
+     color:var(--muted);border-radius:7px;font-size:12px;font-weight:600;padding:3px 8px;cursor:pointer}
+  #wtool button:hover{color:var(--txt)}
+  #wtool #wtDrag.on{background:var(--accent);border-color:var(--accent);color:#05130a}
+  /* al activar "Mover", todo el widget arrastra la ventana */
+  body.widgetmode.dragmove .stage, body.widgetmode.dragmove .lyrics-card{-webkit-app-region:drag;cursor:move}
+  body.widgetmode.dragmove #wtool, body.widgetmode.dragmove #wtool *{-webkit-app-region:no-drag}
   body::before{content:"";position:fixed;inset:0;background:
      radial-gradient(60vw 60vw at 15% -10%, rgba(29,185,84,.14), transparent 60%),
      radial-gradient(50vw 50vw at 110% 10%, rgba(120,80,255,.12), transparent 60%);
@@ -224,6 +252,10 @@
 </style>
 </head>
 <body>
+<div id="wtool">
+  <button id="wtDrag" title="Activar/desactivar mover">✋</button>
+  <button id="wtClose" title="Cerrar este widget">✕</button>
+</div>
 <div id="dragbar">
   <span class="db-grip">⠿</span><span class="db-name">Vibe</span>
   <span id="dbHint" style="opacity:.6">· fijo</span>
@@ -369,6 +401,10 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ---------- modo widget ----------
+// ?widget=card|bar|vinyl|poster|lyrics  → ventana individual con solo ese diseño
+const WIDGET = new URLSearchParams(location.search).get('widget');
+
 // ---------- state ----------
 const COVERS = [
   "https://picsum.photos/seed/vibe1/600",
@@ -398,6 +434,25 @@ const state={
   durationMs:218000, positionMs:0.38*218000, lastSync:Date.now(),
   showLyrics:true
 };
+
+// ---------- ajustes compartidos entre ventanas (panel <-> widgets) ----------
+function readSettings(){ try{return JSON.parse(localStorage.getItem('vibe_settings'));}catch(e){return null;} }
+function applySettings(s){
+  if(!s)return;
+  if(s.accent)state.accent=s.accent;
+  if(typeof s.auto==='boolean')state.auto=s.auto;
+  if(s.bg)state.bg=s.bg;
+  if(typeof s.palette==='number')state.palette=s.palette;
+  if(s.opts)state.opts=Object.assign({},state.opts,s.opts);
+  if(typeof s.showLyrics==='boolean')state.showLyrics=s.showLyrics;
+}
+let lastSettingsStr='';
+function maybeSaveSettings(){
+  if(WIDGET)return; // solo el panel de control escribe los ajustes
+  const s={accent:state.accent,auto:state.auto,bg:state.bg,palette:state.palette,opts:state.opts,showLyrics:state.showLyrics};
+  const str=JSON.stringify(s);
+  if(str!==lastSettingsStr){ lastSettingsStr=str; try{localStorage.setItem('vibe_settings',str);}catch(e){} }
+}
 
 const host=document.getElementById('widgetHost');
 const stageLabel=document.getElementById('stageLabel');
@@ -445,6 +500,7 @@ function progHTML(){
 
 // ---------- render ----------
 function render(){
+  if(!WIDGET)maybeSaveSettings();
   resolveAccent(accent=>{
     const r=state.opts.round;
     const round=r?'':'border-radius:4px';
@@ -928,6 +984,32 @@ function startPolling(){
   }
 })();
 
+// ---------- aplicar modo widget ----------
+function applyWidgetMode(){
+  if(!WIDGET)return;
+  document.body.classList.add('widgetmode','w-'+WIDGET);
+  const styleMap={card:'card',bar:'bar',vinyl:'vinyl',poster:'hero'};
+  if(styleMap[WIDGET])state.style=styleMap[WIDGET];
+  if(WIDGET==='lyrics')state.showLyrics=true;
+  state.previewOverride=true; // los widgets nunca salen "bloqueados"
+  const wtDrag=document.getElementById('wtDrag');
+  const wtClose=document.getElementById('wtClose');
+  if(wtDrag)wtDrag.onclick=()=>{ const on=document.body.classList.toggle('dragmove'); wtDrag.classList.toggle('on',on); };
+  if(wtClose)wtClose.onclick=()=>{ try{window.close();}catch(e){} };
+  // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
+  let lastW=localStorage.getItem('vibe_settings')||'';
+  setInterval(()=>{
+    const cur=localStorage.getItem('vibe_settings')||'';
+    if(cur!==lastW){ lastW=cur; applySettings(readSettings()); render(); highlightLyrics(true); }
+    if(!state.live && localStorage.getItem('vibe_token')){ state.live=true; startPolling(); }
+  },1000);
+}
+// sincronización en vivo entre ventanas (panel <-> widgets)
+window.addEventListener('storage',(e)=>{
+  if(e.key==='vibe_settings'){ applySettings(readSettings()); render(); highlightLyrics(true); }
+  if(e.key==='vibe_token' && e.newValue && !state.live){ state.live=true; startPolling(); }
+});
+
 // ---------- app de escritorio (Electron): barra de arrastre ----------
 if(navigator.userAgent.includes('Electron')){
   document.body.classList.add('electron');
@@ -944,6 +1026,7 @@ if(navigator.userAgent.includes('Electron')){
 }
 
 // init
+if(WIDGET){ applyWidgetMode(); applySettings(readSettings()); }
 syncSwatch();render();fetchLyrics();updateLock();
 </script>
 </body>
