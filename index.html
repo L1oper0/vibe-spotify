@@ -19,6 +19,24 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden}
+  /* Barra para arrastrar la ventana (solo en la app de escritorio) */
+  #dragbar{display:none}
+  body.electron #dragbar{display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 12px;
+     position:sticky;top:0;z-index:200;background:rgba(10,10,15,.92);backdrop-filter:blur(6px);
+     border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);user-select:none;
+     -webkit-app-region:no-drag}
+  /* Solo se puede arrastrar cuando el modo "Mover" está activado */
+  body.electron.dragmove #dragbar{-webkit-app-region:drag;cursor:move;background:rgba(29,185,84,.18)}
+  /* La cabecera nunca arrastra: el único control de movimiento es el botón "Mover" */
+  body.electron header{-webkit-app-region:no-drag !important}
+  #dragbar .db-grip{letter-spacing:2px;opacity:.8}
+  #dragbar .db-name{font-weight:700;color:var(--txt)}
+  #dragbar .db-spacer{flex:1}
+  #dragbar button{-webkit-app-region:no-drag;background:none;border:1px solid var(--line);color:var(--muted);
+     cursor:pointer;font-size:12px;font-weight:600;padding:3px 9px;border-radius:7px;line-height:1}
+  #dragbar button:hover{background:rgba(255,255,255,.1);color:var(--txt)}
+  #dragbar #dbDrag.on{background:var(--accent);border-color:var(--accent);color:#05130a}
+  #dragbar #dbClose{border:none;font-size:14px;padding:3px 8px}
   body::before{content:"";position:fixed;inset:0;background:
      radial-gradient(60vw 60vw at 15% -10%, rgba(29,185,84,.14), transparent 60%),
      radial-gradient(50vw 50vw at 110% 10%, rgba(120,80,255,.12), transparent 60%);
@@ -206,6 +224,13 @@
 </style>
 </head>
 <body>
+<div id="dragbar">
+  <span class="db-grip">⠿</span><span class="db-name">Vibe</span>
+  <span id="dbHint" style="opacity:.6">· fijo</span>
+  <span class="db-spacer"></span>
+  <button id="dbDrag" title="Activar o desactivar el modo mover">🔒 Mover</button>
+  <button id="dbClose" title="Cerrar (se puede reabrir desde la bandeja)">✕</button>
+</div>
 <div class="wrap">
   <header>
     <div class="logo">♪</div>
@@ -902,6 +927,21 @@ function startPolling(){
     state.live=true;startPolling();
   }
 })();
+
+// ---------- app de escritorio (Electron): barra de arrastre ----------
+if(navigator.userAgent.includes('Electron')){
+  document.body.classList.add('electron');
+  const dragBtn=document.getElementById('dbDrag');
+  const hint=document.getElementById('dbHint');
+  if(dragBtn)dragBtn.onclick=()=>{
+    const on=document.body.classList.toggle('dragmove');
+    dragBtn.classList.toggle('on',on);
+    dragBtn.textContent=on?'✋ Moviendo':'🔒 Mover';
+    if(hint)hint.textContent=on?'· arrástralo':'· fijo';
+  };
+  const close=document.getElementById('dbClose');
+  if(close)close.onclick=()=>{try{window.close();}catch(e){}};
+}
 
 // init
 syncSwatch();render();fetchLyrics();updateLock();
