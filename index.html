@@ -78,7 +78,7 @@
   body.widgetmode .lyrics-head, body.widgetmode .lyrics-body{-webkit-app-region:no-drag}
   /* ---- PNG más limpio en modo widget ---- */
   body.widgetmode .stage{padding:0}
-  body.widgetmode .widget{box-shadow:0 12px 34px rgba(0,0,0,.5) !important}
+  body.widgetmode .widget{box-shadow:0 6px 16px rgba(0,0,0,.42) !important}
   body.widgetmode .w-card, body.widgetmode .w-vinyl,
   body.widgetmode .w-bar, body.widgetmode .w-hero{border:1px solid rgba(255,255,255,.1)}
   body::before{content:"";position:fixed;inset:0;background:
@@ -276,6 +276,8 @@
 <div id="wtool">
   <span class="wt-grip" title="Arrastra para mover el widget"><span class="dot">⠿</span> Vibe</span>
   <span class="wt-spacer"></span>
+  <button id="wtMinus" title="Más pequeño">−</button>
+  <button id="wtPlus" title="Más grande">+</button>
   <button id="wtLock" title="Bloquear posición">🔓</button>
   <button id="wtClose" title="Cerrar este widget">✕</button>
 </div>
@@ -340,6 +342,11 @@
           <button class="stylebtn" data-style="vinyl">Vinilo</button>
           <button class="stylebtn" data-style="hero">Póster</button>
         </div>
+        <div class="hint" id="styleHint" style="display:none">💡 <b>Doble clic</b> en un estilo para mostrarlo en el escritorio.</div>
+        <div class="seg" id="showRow" style="margin-top:10px;display:none">
+          <button id="showWidgetBtn">🖥 Mostrar en escritorio</button>
+          <button id="showLyricsBtn">🎤 Mostrar letra</button>
+        </div>
       </div>
 
       <div class="sec">
@@ -395,10 +402,21 @@
         <button class="btn" id="playBtn">⏸ Pausa</button>
       </div>
 
+      <div class="sec" id="updateSec" style="display:none">
+        <h3>Actualizaciones</h3>
+        <div class="field" style="align-items:center">
+          <label id="updLabel">Buscar versiones nuevas</label>
+          <button class="btn" id="updBtn" style="flex:none;padding:7px 12px">Buscar</button>
+        </div>
+        <button class="btn" id="updRestart" style="display:none;width:100%;margin-top:10px;background:var(--accent);color:#05130a;border:none;font-weight:800">↻ Reiniciar para actualizar</button>
+        <div class="hint" id="updHint" style="margin-top:8px"></div>
+      </div>
+
       <div id="freeNote" class="free-note" style="display:none">
-        <b>Tienes Spotify Gratuito.</b> Puedes ver en los widgets lo que suena, pero
-        <b>no controlar la reproducción</b> (play/pausa, pasar de canción y saltar en la barra):
-        eso es parte de <b>Spotify Premium</b>.
+        <b>Tienes Spotify Gratuito.</b> Puedes ver en los widgets lo que suena. En la
+        <b>app de Vibe de escritorio</b>, los botones de <b>play/pausa y cambiar de canción</b>
+        sí funcionan (usan las teclas multimedia de tu PC). Saltar dentro de la barra de
+        progreso sigue necesitando <b>Spotify Premium</b>.
       </div>
     </div>
   </div>
@@ -770,6 +788,18 @@ document.getElementById('styleGrid').addEventListener('click',e=>{
   document.querySelectorAll('.stylebtn').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');state.style=b.dataset.style;render();
 });
+// Doble clic en un estilo → mostrarlo como widget en el escritorio
+function openDesktopWidget(style){
+  const key=(style==='hero')?'poster':style;
+  if(window.vibe&&window.vibe.openWidget){ window.vibe.openWidget(key); toast('Mostrando «'+key+'» en el escritorio'); }
+}
+document.getElementById('styleGrid').addEventListener('dblclick',e=>{
+  const b=e.target.closest('.stylebtn');if(!b)return; openDesktopWidget(b.dataset.style);
+});
+(()=>{ const sw=document.getElementById('showWidgetBtn'), sl=document.getElementById('showLyricsBtn');
+  if(sw)sw.onclick=()=>openDesktopWidget(state.style);
+  if(sl)sl.onclick=()=>{ if(window.vibe&&window.vibe.openWidget){ window.vibe.openWidget('lyrics'); toast('Mostrando la letra en el escritorio'); } };
+})();
 document.getElementById('bgSeg').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
   document.querySelectorAll('#bgSeg button').forEach(x=>x.classList.remove('active'));
@@ -840,13 +870,22 @@ host.addEventListener('click',async e=>{
     const t=await token();if(!t)return;
     try{
       const res=await fetch('https://api.spotify.com/v1/me/player/seek?position_ms='+ms,{method:'PUT',headers:{Authorization:'Bearer '+t}});
-      if(res.status===403){toast('Saltar en la canción no puedes hacerlo porque tienes Spotify Gratuito; es parte del Premium');return;}
+      if(res.status===403){toast('Saltar dentro de la barra necesita Premium. En gratis puedes pausar y cambiar de canción.');return;}
       state.positionMs=ms;state.lastSync=Date.now();updateProgressInPlace();setTimeout(poll,400);
     }catch(err){toast('No se pudo saltar');}
     return;
   }
   const ico=e.target.closest('.ico[data-act]');if(!ico)return;
   const act=ico.dataset.act;
+  // Teclas multimedia del sistema: funcionan también en Spotify Gratuito (solo app de escritorio)
+  const mediaMap={toggle:'playpause',next:'next',prev:'prev'};
+  function tryMediaKey(){ if(window.vibe&&window.vibe.media&&mediaMap[act]){ window.vibe.media(mediaMap[act]); if(act==='toggle')setPlaying(!state.playing); setTimeout(poll,600); return true; } return false; }
+  // Si la cuenta no es premium, usar directamente las teclas multimedia
+  if(state.plan && state.plan!=='premium'){
+    if(tryMediaKey())return;
+    if(!state.live){ if(act==='toggle')setPlaying(!state.playing); else toast('Conecta Spotify para controlar la reproducción'); return; }
+    toast('Para pausar o cambiar canción en gratis, usa la app de Vibe de escritorio'); return;
+  }
   if(!state.live){
     // modo demo: solo alterna play/pausa visual
     if(act==='toggle'){setPlaying(!state.playing);}
@@ -855,13 +894,12 @@ host.addEventListener('click',async e=>{
   }
   const t=await token();if(!t)return;
   const base='https://api.spotify.com/v1/me/player/';
-  const names={prev:'Volver a la anterior',next:'Pasar a la siguiente',toggle:'Reproducir o pausar'};
   try{
     let res;
     if(act==='prev') res=await fetch(base+'previous',{method:'POST',headers:{Authorization:'Bearer '+t}});
     else if(act==='next') res=await fetch(base+'next',{method:'POST',headers:{Authorization:'Bearer '+t}});
     else if(act==='toggle') res=await fetch(base+(state.playing?'pause':'play'),{method:'PUT',headers:{Authorization:'Bearer '+t}});
-    if(res && res.status===403){ toast(names[act]+' no puedes hacerlo porque tienes Spotify Gratuito; es parte del Premium'); return; }
+    if(res && res.status===403){ if(tryMediaKey())return; toast('Ese control necesita Spotify Premium'); return; }
     if(res && res.status===404){ toast('Abre Spotify en algún dispositivo y dale al play una vez'); return; }
     setTimeout(poll,350);
   }catch(err){toast('No se pudo controlar la reproducción');}
@@ -1060,9 +1098,13 @@ function fitWidget(){
   el.style.transform='none'; el.style.zoom='1';
   const r=el.getBoundingClientRect();
   if(!r.width||!r.height)return;
-  const m=8;
+  const m=18; // margen para que la sombra no se recorte contra el borde
   const s=Math.max(0.4, Math.min(3, Math.min((window.innerWidth-m)/r.width, (window.innerHeight-m)/r.height)));
   el.style.zoom=s;
+  // informar de la proporción natural (una vez) para que la ventana no deje huecos
+  if(!fitWidget._reported && window.vibe && window.vibe.reportAspect){
+    fitWidget._reported=true; try{ window.vibe.reportAspect(r.width/r.height); }catch(e){}
+  }
 }
 window.addEventListener('resize',fitWidget);
 
@@ -1084,7 +1126,10 @@ function applyWidgetMode(){
     wtLock.onclick=()=>{ const fixed=!document.body.classList.contains('wfixed'); setLock(fixed);
        try{localStorage.setItem('vibe_wfixed_'+WIDGET, fixed?'1':'0');}catch(e){} fitWidget(); };
   }
-  if(wtClose)wtClose.onclick=()=>{ try{window.close();}catch(e){} };
+  if(wtClose)wtClose.onclick=()=>{ if(window.vibe&&window.vibe.closeSelf){window.vibe.closeSelf();} else {try{window.close();}catch(e){}} };
+  const wtMinus=document.getElementById('wtMinus'), wtPlus=document.getElementById('wtPlus');
+  if(wtMinus)wtMinus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(0.85); };
+  if(wtPlus)wtPlus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(1.18); };
   if(bc)bc.onmessage=(e)=>{ if(e.data&&e.data.k==='settings'){ applySettings(e.data.v); render(); highlightLyrics(true); } };
   // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
   let lastW=localStorage.getItem('vibe_settings')||'';
@@ -1113,6 +1158,24 @@ if(navigator.userAgent.includes('Electron')){
   };
   const close=document.getElementById('dbClose');
   if(close)close.onclick=()=>{try{window.close();}catch(e){}};
+}
+
+// ---------- puente de escritorio (solo en el panel de control) ----------
+if(window.vibe && !WIDGET){
+  ['styleHint','showRow','updateSec'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
+  const updBtn=document.getElementById('updBtn'), updHint=document.getElementById('updHint'),
+        updRestart=document.getElementById('updRestart');
+  if(updBtn)updBtn.onclick=()=>{ if(window.vibe.checkUpdate){ window.vibe.checkUpdate(); if(updHint)updHint.textContent='Buscando actualizaciones…'; } };
+  if(updRestart)updRestart.onclick=()=>{ if(window.vibe.restartToUpdate)window.vibe.restartToUpdate(); };
+  if(window.vibe.onUpdateStatus)window.vibe.onUpdateStatus((d)=>{
+    if(!updHint)return;
+    if(d.state==='checking')updHint.textContent='Buscando actualizaciones…';
+    else if(d.state==='downloading')updHint.textContent='Descargando'+(d.percent!=null?(' '+d.percent+'%'):'')+'…';
+    else if(d.state==='uptodate')updHint.textContent='Ya tienes la última versión ✅';
+    else if(d.state==='ready'){ updHint.textContent='Actualización lista'+(d.version?(' (v'+d.version+')'):'')+'. Pulsa reiniciar.'; if(updRestart)updRestart.style.display=''; }
+    else if(d.state==='error')updHint.textContent='No se pudo comprobar ahora, inténtalo más tarde.';
+    else if(d.state==='unsupported')updHint.textContent='Actualización automática no disponible.';
+  });
 }
 
 // init
