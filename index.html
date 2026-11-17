@@ -404,6 +404,8 @@
 // ---------- modo widget ----------
 // ?widget=card|bar|vinyl|poster|lyrics  → ventana individual con solo ese diseño
 const WIDGET = new URLSearchParams(location.search).get('widget');
+// canal directo entre el panel y los widgets (actualización instantánea)
+const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('vibe') : null;
 
 // ---------- state ----------
 const COVERS = [
@@ -451,7 +453,8 @@ function maybeSaveSettings(){
   if(WIDGET)return; // solo el panel de control escribe los ajustes
   const s={accent:state.accent,auto:state.auto,bg:state.bg,palette:state.palette,opts:state.opts,showLyrics:state.showLyrics};
   const str=JSON.stringify(s);
-  if(str!==lastSettingsStr){ lastSettingsStr=str; try{localStorage.setItem('vibe_settings',str);}catch(e){} }
+  if(str!==lastSettingsStr){ lastSettingsStr=str; try{localStorage.setItem('vibe_settings',str);}catch(e){}
+    if(bc)try{bc.postMessage({k:'settings',v:s});}catch(e){} }
 }
 
 const host=document.getElementById('widgetHost');
@@ -599,6 +602,7 @@ function render(){
       }
       w.insertBefore(layer,w.firstChild);
     }
+    if(WIDGET)fitWidget();
   });
 }
 function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -984,6 +988,18 @@ function startPolling(){
   }
 })();
 
+// ---------- escalar el widget al tamaño de la ventana ----------
+const WIDGET_BASE={card:{w:360,h:470},bar:{w:420,h:84},vinyl:{w:360,h:440},hero:{w:420,h:560}};
+function fitWidget(){
+  if(!WIDGET || WIDGET==='lyrics')return;
+  const el=host.querySelector('.widget');if(!el)return;
+  const base=WIDGET_BASE[state.style]||{w:360,h:460};
+  const s=Math.max(0.35, Math.min(3, Math.min((window.innerWidth-14)/base.w, (window.innerHeight-14)/base.h)));
+  el.style.transformOrigin='center center';
+  el.style.transform='scale('+s+')';
+}
+window.addEventListener('resize',fitWidget);
+
 // ---------- aplicar modo widget ----------
 function applyWidgetMode(){
   if(!WIDGET)return;
@@ -996,13 +1012,14 @@ function applyWidgetMode(){
   const wtClose=document.getElementById('wtClose');
   if(wtDrag)wtDrag.onclick=()=>{ const on=document.body.classList.toggle('dragmove'); wtDrag.classList.toggle('on',on); };
   if(wtClose)wtClose.onclick=()=>{ try{window.close();}catch(e){} };
+  if(bc)bc.onmessage=(e)=>{ if(e.data&&e.data.k==='settings'){ applySettings(e.data.v); render(); highlightLyrics(true); } };
   // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
   let lastW=localStorage.getItem('vibe_settings')||'';
   setInterval(()=>{
     const cur=localStorage.getItem('vibe_settings')||'';
     if(cur!==lastW){ lastW=cur; applySettings(readSettings()); render(); highlightLyrics(true); }
     if(!state.live && localStorage.getItem('vibe_token')){ state.live=true; startPolling(); }
-  },1000);
+  },600);
 }
 // sincronización en vivo entre ventanas (panel <-> widgets)
 window.addEventListener('storage',(e)=>{
