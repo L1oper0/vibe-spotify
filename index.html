@@ -205,6 +205,11 @@
   .ritem .rmeta{min-width:0;flex:1}
   .acts{display:flex;gap:8px;padding:14px 16px}
   .acts .btn{flex:1;text-align:center}
+  .plan-badge{font-size:12px;font-weight:700;padding:5px 10px;border-radius:99px;white-space:nowrap}
+  .plan-badge.premium{background:rgba(29,185,84,.18);color:var(--accent);border:1px solid var(--accent)}
+  .plan-badge.free{background:rgba(255,176,46,.16);color:#ffb02e;border:1px solid rgba(255,176,46,.5)}
+  .free-note{margin:0 16px 16px;padding:12px 14px;border-radius:12px;font-size:12.5px;line-height:1.6;
+     background:rgba(255,176,46,.1);border:1px solid rgba(255,176,46,.35);color:#ffd79a}
 
   dialog{border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:18px;
      padding:0;max-width:480px;width:92vw}
@@ -271,6 +276,7 @@
       <div class="sub">Widgets visuales de Spotify</div>
     </div>
     <div class="spacer"></div>
+    <span id="planBadge" class="plan-badge" style="display:none"></span>
     <button class="btn ghost" id="connectBtn">Conectar Spotify</button>
     <button class="btn primary" id="exportBtn">Descargar imagen</button>
   </header>
@@ -370,6 +376,12 @@
         <button class="btn" id="randomBtn">🎲 Otra portada</button>
         <button class="btn" id="playBtn">⏸ Pausa</button>
       </div>
+
+      <div id="freeNote" class="free-note" style="display:none">
+        <b>Tienes Spotify Gratuito.</b> Puedes ver en los widgets lo que suena, pero
+        <b>no controlar la reproducción</b> (play/pausa, pasar de canción y saltar en la barra):
+        eso es parte de <b>Spotify Premium</b>.
+      </div>
     </div>
   </div>
 </div>
@@ -432,7 +444,7 @@ const state={
   opts:{progress:true,controls:true,eq:true,round:true},
   title:"Midnight City", artist:"M83",
   cover:COVERS[0], playing:true, progress:0.38,
-  live:false, previewOverride:false,
+  live:false, previewOverride:false, plan:null,
   durationMs:218000, positionMs:0.38*218000, lastSync:Date.now(),
   showLyrics:true
 };
@@ -810,7 +822,7 @@ host.addEventListener('click',async e=>{
     const t=await token();if(!t)return;
     try{
       const res=await fetch('https://api.spotify.com/v1/me/player/seek?position_ms='+ms,{method:'PUT',headers:{Authorization:'Bearer '+t}});
-      if(res.status===403){toast('Saltar en la canción necesita Spotify Premium');return;}
+      if(res.status===403){toast('Saltar en la canción no puedes hacerlo porque tienes Spotify Gratuito; es parte del Premium');return;}
       state.positionMs=ms;state.lastSync=Date.now();updateProgressInPlace();setTimeout(poll,400);
     }catch(err){toast('No se pudo saltar');}
     return;
@@ -825,14 +837,16 @@ host.addEventListener('click',async e=>{
   }
   const t=await token();if(!t)return;
   const base='https://api.spotify.com/v1/me/player/';
+  const names={prev:'Volver a la anterior',next:'Pasar a la siguiente',toggle:'Reproducir o pausar'};
   try{
-    if(act==='prev') await fetch(base+'previous',{method:'POST',headers:{Authorization:'Bearer '+t}});
-    if(act==='next') await fetch(base+'next',{method:'POST',headers:{Authorization:'Bearer '+t}});
-    if(act==='toggle'){
-      await fetch(base+(state.playing?'pause':'play'),{method:'PUT',headers:{Authorization:'Bearer '+t}});
-    }
+    let res;
+    if(act==='prev') res=await fetch(base+'previous',{method:'POST',headers:{Authorization:'Bearer '+t}});
+    else if(act==='next') res=await fetch(base+'next',{method:'POST',headers:{Authorization:'Bearer '+t}});
+    else if(act==='toggle') res=await fetch(base+(state.playing?'pause':'play'),{method:'PUT',headers:{Authorization:'Bearer '+t}});
+    if(res && res.status===403){ toast(names[act]+' no puedes hacerlo porque tienes Spotify Gratuito; es parte del Premium'); return; }
+    if(res && res.status===404){ toast('Abre Spotify en algún dispositivo y dale al play una vez'); return; }
     setTimeout(poll,350);
-  }catch(err){toast('Necesitas Spotify Premium para esto');}
+  }catch(err){toast('No se pudo controlar la reproducción');}
 });
 
 // ---------- search & play ----------
@@ -909,7 +923,7 @@ let tT;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2600);}
 
 // ---------- Spotify PKCE ----------
-const SCOPES="user-read-currently-playing user-read-playback-state user-modify-playback-state";
+const SCOPES="user-read-currently-playing user-read-playback-state user-modify-playback-state user-read-private";
 function redirectUri(){return location.origin+location.pathname;}
 const dlg=document.getElementById('dlg');
 document.getElementById('connectBtn').onclick=()=>{document.getElementById('redirUri').value=redirectUri();dlg.showModal();
@@ -984,9 +998,26 @@ async function poll(){
     }
   }catch(e){}
 }
+async function fetchProfile(){
+  const t=await token();if(!t)return;
+  try{
+    const res=await fetch('https://api.spotify.com/v1/me',{headers:{Authorization:'Bearer '+t}});
+    if(res.ok){ const d=await res.json(); state.plan=d.product||null; updatePlanUI(); }
+  }catch(e){}
+}
+function updatePlanUI(){
+  if(WIDGET)return; // solo en el panel de control
+  const badge=document.getElementById('planBadge');
+  const note=document.getElementById('freeNote');
+  if(!badge)return;
+  if(state.plan==='premium'){ badge.textContent='Premium'; badge.className='plan-badge premium'; badge.style.display=''; if(note)note.style.display='none'; }
+  else if(state.plan){ badge.textContent='Gratuito'; badge.className='plan-badge free'; badge.style.display=''; if(note)note.style.display=''; }
+}
+
 let pollT;
 function startPolling(){
   dlg.open&&dlg.close();
+  fetchProfile();
   document.getElementById('connectBtn').textContent='● Spotify conectado';
   document.getElementById('liveHint').textContent='Busca una canción y toca para reproducirla. Controlar el play necesita Spotify Premium.';
   updateLock();
