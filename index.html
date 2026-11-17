@@ -53,18 +53,34 @@
   body.w-lyrics .lyrics-card{margin:0;border:none;border-radius:16px;height:100vh;
      background:rgba(10,10,15,.72);backdrop-filter:blur(12px)}
   body.w-lyrics .lyrics-body{max-height:none;height:calc(100vh - 48px)}
-  /* mini-barra flotante que aparece al pasar el ratón */
+  /* ---- Barrita superior del widget (aparece al pasar el ratón) ---- */
   #wtool{display:none}
-  body.widgetmode #wtool{display:flex;position:fixed;top:6px;right:6px;z-index:300;gap:6px;opacity:0;
-     transition:.15s;-webkit-app-region:no-drag}
-  body.widgetmode:hover #wtool{opacity:1}
-  #wtool button{-webkit-app-region:no-drag;background:rgba(10,10,15,.85);border:1px solid var(--line);
-     color:var(--muted);border-radius:7px;font-size:12px;font-weight:600;padding:3px 8px;cursor:pointer}
-  #wtool button:hover{color:var(--txt)}
-  #wtool #wtDrag.on{background:var(--accent);border-color:var(--accent);color:#05130a}
-  /* al activar "Mover", todo el widget arrastra la ventana */
-  body.widgetmode.dragmove .stage, body.widgetmode.dragmove .lyrics-card{-webkit-app-region:drag;cursor:move}
-  body.widgetmode.dragmove #wtool, body.widgetmode.dragmove #wtool *{-webkit-app-region:no-drag}
+  body.widgetmode #wtool{display:flex;align-items:center;gap:6px;position:fixed;top:0;left:0;right:0;
+     height:28px;padding:0 6px 0 8px;z-index:400;opacity:0;transform:translateY(-6px);transition:.14s;
+     background:linear-gradient(180deg,rgba(8,8,13,.95),rgba(8,8,13,.5) 65%,transparent);
+     -webkit-app-region:no-drag}
+  body.widgetmode:hover #wtool{opacity:1;transform:translateY(0)}
+  #wtool .wt-grip{-webkit-app-region:drag;cursor:move;display:flex;align-items:center;gap:6px;
+     font-size:11px;font-weight:700;letter-spacing:.4px;color:rgba(255,255,255,.82);
+     padding:4px 9px;border-radius:7px}
+  #wtool .wt-grip:hover{background:rgba(255,255,255,.12);color:#fff}
+  #wtool .wt-grip .dot{letter-spacing:2px;opacity:.7}
+  #wtool .wt-spacer{flex:1;-webkit-app-region:drag;align-self:stretch;cursor:move}
+  #wtool button{-webkit-app-region:no-drag;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+     color:#fff;border-radius:7px;font-size:12px;font-weight:700;padding:3px 9px;cursor:pointer;line-height:1}
+  #wtool button:hover{background:rgba(255,255,255,.24)}
+  #wtool #wtLock.on{background:var(--accent);border-color:var(--accent);color:#05130a}
+  /* Arrastrar desde cualquier parte mientras NO esté bloqueado... */
+  body.widgetmode:not(.wfixed) .widget,
+  body.widgetmode:not(.wfixed) .lyrics-card{-webkit-app-region:drag}
+  /* ...pero los controles e interacciones siempre se pueden pulsar */
+  body.widgetmode .ico, body.widgetmode .prog,
+  body.widgetmode .lyrics-head, body.widgetmode .lyrics-body{-webkit-app-region:no-drag}
+  /* ---- PNG más limpio en modo widget ---- */
+  body.widgetmode .stage{padding:0}
+  body.widgetmode .widget{box-shadow:0 12px 34px rgba(0,0,0,.5) !important}
+  body.widgetmode .w-card, body.widgetmode .w-vinyl,
+  body.widgetmode .w-bar, body.widgetmode .w-hero{border:1px solid rgba(255,255,255,.1)}
   body::before{content:"";position:fixed;inset:0;background:
      radial-gradient(60vw 60vw at 15% -10%, rgba(29,185,84,.14), transparent 60%),
      radial-gradient(50vw 50vw at 110% 10%, rgba(120,80,255,.12), transparent 60%);
@@ -258,7 +274,9 @@
 </head>
 <body>
 <div id="wtool">
-  <button id="wtDrag" title="Activar/desactivar mover">✋</button>
+  <span class="wt-grip" title="Arrastra para mover el widget"><span class="dot">⠿</span> Vibe</span>
+  <span class="wt-spacer"></span>
+  <button id="wtLock" title="Bloquear posición">🔓</button>
   <button id="wtClose" title="Cerrar este widget">✕</button>
 </div>
 <div id="dragbar">
@@ -1034,15 +1052,17 @@ function startPolling(){
   }
 })();
 
-// ---------- escalar el widget al tamaño de la ventana ----------
-const WIDGET_BASE={card:{w:360,h:470},bar:{w:420,h:84},vinyl:{w:360,h:440},hero:{w:420,h:560}};
+// ---------- escalar el widget al tamaño de la ventana (nítido, con zoom) ----------
 function fitWidget(){
   if(!WIDGET || WIDGET==='lyrics')return;
   const el=host.querySelector('.widget');if(!el)return;
-  const base=WIDGET_BASE[state.style]||{w:360,h:460};
-  const s=Math.max(0.35, Math.min(3, Math.min((window.innerWidth-14)/base.w, (window.innerHeight-14)/base.h)));
-  el.style.transformOrigin='center center';
-  el.style.transform='scale('+s+')';
+  // medir el tamaño natural del widget para ajustarlo sin hueco y sin pixelar
+  el.style.transform='none'; el.style.zoom='1';
+  const r=el.getBoundingClientRect();
+  if(!r.width||!r.height)return;
+  const m=8;
+  const s=Math.max(0.4, Math.min(3, Math.min((window.innerWidth-m)/r.width, (window.innerHeight-m)/r.height)));
+  el.style.zoom=s;
 }
 window.addEventListener('resize',fitWidget);
 
@@ -1054,9 +1074,16 @@ function applyWidgetMode(){
   if(styleMap[WIDGET])state.style=styleMap[WIDGET];
   if(WIDGET==='lyrics')state.showLyrics=true;
   state.previewOverride=true; // los widgets nunca salen "bloqueados"
-  const wtDrag=document.getElementById('wtDrag');
+  const wtLock=document.getElementById('wtLock');
   const wtClose=document.getElementById('wtClose');
-  if(wtDrag)wtDrag.onclick=()=>{ const on=document.body.classList.toggle('dragmove'); wtDrag.classList.toggle('on',on); };
+  if(wtLock){
+    const setLock=(fixed)=>{ document.body.classList.toggle('wfixed',fixed); wtLock.classList.toggle('on',fixed);
+       wtLock.textContent=fixed?'🔒':'🔓'; wtLock.title=fixed?'Desbloquear (permite mover)':'Bloquear posición'; };
+    let saved=false; try{saved=localStorage.getItem('vibe_wfixed_'+WIDGET)==='1';}catch(e){}
+    setLock(saved);
+    wtLock.onclick=()=>{ const fixed=!document.body.classList.contains('wfixed'); setLock(fixed);
+       try{localStorage.setItem('vibe_wfixed_'+WIDGET, fixed?'1':'0');}catch(e){} fitWidget(); };
+  }
   if(wtClose)wtClose.onclick=()=>{ try{window.close();}catch(e){} };
   if(bc)bc.onmessage=(e)=>{ if(e.data&&e.data.k==='settings'){ applySettings(e.data.v); render(); highlightLyrics(true); } };
   // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
