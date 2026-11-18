@@ -1146,15 +1146,17 @@ function fitWidget(){
   const el=host.querySelector('.widget');if(!el)return;
   // Medir el tamaño natural SIN zoom (offsetWidth/Height son fiables; getBoundingClientRect
   // con zoom puesto puede devolver un tamaño erróneo y hacer que el widget se pase de la ventana).
-  el.style.transform='none';
   el.style.zoom='';
-  const w=el.offsetWidth, h=el.offsetHeight;   // fuerza reflujo y da el tamaño real sin zoom
+  el.style.transform='none';
+  const w=el.offsetWidth, h=el.offsetHeight;   // tamaño natural; transform NO afecta al layout, así que es fiable
   if(!w||!h)return;
-  // SH reserva sitio para la sombra (va dentro de la división, así escala con el zoom).
-  const SH=40;
+  // Escalar con transform:scale (a prueba de recortes): la caja de layout sigue siendo w×h,
+  // centrada, y se escala visualmente. Como s*w<=ventana y s*h<=ventana, nunca se sale.
+  const SH=36;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
-  s=Math.max(0.4, Math.min(3, s*0.98));        // 0.98 = pequeño margen anti-recorte
-  el.style.zoom=s;
+  s=Math.max(0.35, Math.min(3, s*0.98));
+  el.style.transformOrigin='center center';
+  el.style.transform='scale('+s+')';
   if(!fitWidget._reported && window.vibe && window.vibe.reportAspect){
     fitWidget._reported=true; try{ window.vibe.reportAspect(w/h); }catch(e){}
   }
