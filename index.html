@@ -81,24 +81,26 @@
   body.widgetmode .widget{box-shadow:0 4px 14px rgba(0,0,0,.4) !important}
   body.widgetmode .w-card, body.widgetmode .w-vinyl,
   body.widgetmode .w-bar, body.widgetmode .w-hero{border:1px solid rgba(255,255,255,.1)}
-  /* ---- Tarjeta FLUIDA: llena la ventana (menos un margen para la sombra), todo en
-     proporción (cqw = 1% del ancho de la tarjeta). No se escala: siempre completa y centrada. ---- */
-  body.widgetmode .w-card{
-    position:fixed; inset:8px; width:auto; height:auto; box-sizing:border-box;
+  /* ---- Tarjeta FLUIDA (solo en la ventana de la tarjeta): el contenedor llena la ventana y la
+     tarjeta lo llena al 100%. Todo en vmin (proporción a la ventana). Sin escalar, sin
+     container-type ni position:fixed en la tarjeta → siempre completa, nítida y centrada. ---- */
+  body.widgetmode.w-card #widgetHost{position:fixed; inset:8px; display:block}
+  body.widgetmode.w-card .w-card{
+    width:100%; height:100%; box-sizing:border-box; margin:0;
     display:flex; flex-direction:column; justify-content:center;
-    container-type:size; padding:5.5cqw; border-radius:6cqw}
-  body.widgetmode .w-card .cover{width:100%; flex:1 1 auto; min-height:0; aspect-ratio:auto;
-    margin-bottom:4cqw; border-radius:4cqw}
-  body.widgetmode .w-card .title{font-size:6.4cqw; line-height:1.12}
-  body.widgetmode .w-card .artist{font-size:4.2cqw; margin-top:.6cqw}
-  body.widgetmode .w-card .bars{height:5cqw; gap:.8cqw}
-  body.widgetmode .w-card .bars span{width:1.1cqw}
-  body.widgetmode .w-card .prog{height:1cqw}
-  body.widgetmode .w-card .times{font-size:3cqw; margin-top:1.4cqw}
-  body.widgetmode .w-card .row{margin-top:3.5cqw !important; gap:4cqw}
-  body.widgetmode .w-card .ico{width:12cqw; height:12cqw}
-  body.widgetmode .w-card .ico svg{width:45%; height:45%}
-  body.widgetmode .w-card > div[style*="margin-top:14px"]{margin-top:3.5cqw !important}
+    padding:5.5vmin; border-radius:6vmin}
+  body.widgetmode.w-card .w-card .cover{width:100%; flex:1 1 auto; min-height:0; aspect-ratio:auto;
+    margin-bottom:4vmin; border-radius:4vmin}
+  body.widgetmode.w-card .w-card .title{font-size:6.4vmin; line-height:1.12}
+  body.widgetmode.w-card .w-card .artist{font-size:4.2vmin; margin-top:.6vmin}
+  body.widgetmode.w-card .w-card .bars{height:5vmin; gap:.8vmin}
+  body.widgetmode.w-card .w-card .bars span{width:1.1vmin}
+  body.widgetmode.w-card .w-card .prog{height:1vmin}
+  body.widgetmode.w-card .w-card .times{font-size:3vmin; margin-top:1.4vmin}
+  body.widgetmode.w-card .w-card .row{margin-top:3.5vmin !important; gap:4vmin}
+  body.widgetmode.w-card .w-card .ico{width:12vmin; height:12vmin}
+  body.widgetmode.w-card .w-card .ico svg{width:45%; height:45%}
+  body.widgetmode.w-card .w-card > div[style*="margin-top:14px"]{margin-top:3.5vmin !important}
   body::before{content:"";position:fixed;inset:0;background:
      radial-gradient(60vw 60vw at 15% -10%, rgba(29,185,84,.14), transparent 60%),
      radial-gradient(50vw 50vw at 110% 10%, rgba(120,80,255,.12), transparent 60%);
@@ -1177,14 +1179,9 @@ function fitWidget(){
   const SH=24;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
   s=Math.max(0.3, Math.min(3, s*0.92));   // margen de seguridad
-  // Anclar al CENTRO de la ventana con posición fija y escalar desde ahí.
-  // Así el widget queda SIEMPRE centrado aunque su caja natural sea mayor que la ventana
-  // (lo que arreglaba el desvío a un lado al agrandar/empequeñecer).
-  el.style.position='fixed';
-  el.style.left='50%';
-  el.style.top='50%';
+  el.style.position='static';
   el.style.transformOrigin='center center';
-  el.style.transform='translate(-50%,-50%) scale('+s+')';
+  el.style.transform='scale('+s+')';
 }
 window.addEventListener('resize',fitWidget);
 
