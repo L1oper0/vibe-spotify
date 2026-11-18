@@ -1183,8 +1183,10 @@ function applyWidgetMode(){
   const wtMinus=document.getElementById('wtMinus'), wtPlus=document.getElementById('wtPlus');
   if(wtMinus)wtMinus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(0.85); };
   if(wtPlus)wtPlus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(1.18); };
+  // Minimizar de widget: temporalmente oculto hasta la 1.0.6 (en versiones previas
+  // se minimiza pero no hay forma fiable de recuperarlo). El minimizar del panel sí funciona.
   const wtMin=document.getElementById('wtMin');
-  if(wtMin && window.vibe && window.vibe.minimizeSelf){ wtMin.style.display=''; wtMin.onclick=()=>window.vibe.minimizeSelf(); }
+  if(wtMin) wtMin.style.display='none';
   if(bc)bc.onmessage=(e)=>{ if(e.data&&e.data.k==='settings'){ applySettings(e.data.v); render(); highlightLyrics(true); } };
   // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
   let lastW=localStorage.getItem('vibe_settings')||'';
