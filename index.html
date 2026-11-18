@@ -1250,14 +1250,19 @@ if(navigator.userAgent.includes('Electron')){
 if(window.vibe && !WIDGET){
   ['styleHint','showRow','updateSec'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='';});
   const updBtn=document.getElementById('updBtn'), updHint=document.getElementById('updHint'),
-        updRestart=document.getElementById('updRestart');
-  if(updBtn)updBtn.onclick=()=>{ if(window.vibe.checkUpdate){ window.vibe.checkUpdate(); if(updHint)updHint.textContent='Buscando actualizaciones…'; } };
+        updRestart=document.getElementById('updRestart'), updLabel=document.getElementById('updLabel');
+  // Leer la versión instalada de la identificación de la app (sin tocar el .exe).
+  const _vm=navigator.userAgent.match(/\bVibe\/([\d.]+)/i) || navigator.userAgent.match(/vibe-desktop\/([\d.]+)/i);
+  const _ver=_vm?_vm[1]:null;
+  if(updLabel)updLabel.textContent=_ver?('Versión instalada: '+_ver):'Buscar versiones nuevas';
+  const verTxt=_ver?('Estás en la v'+_ver+'. '):'';
+  if(updBtn)updBtn.onclick=()=>{ if(window.vibe.checkUpdate){ window.vibe.checkUpdate(); if(updHint)updHint.textContent=verTxt+'Buscando actualizaciones…'; } };
   if(updRestart)updRestart.onclick=()=>{ if(window.vibe.restartToUpdate)window.vibe.restartToUpdate(); };
   if(window.vibe.onUpdateStatus)window.vibe.onUpdateStatus((d)=>{
     if(!updHint)return;
-    if(d.state==='checking')updHint.textContent='Buscando actualizaciones…';
+    if(d.state==='checking')updHint.textContent=verTxt+'Buscando actualizaciones…';
     else if(d.state==='downloading')updHint.textContent='Descargando'+(d.percent!=null?(' '+d.percent+'%'):'')+'…';
-    else if(d.state==='uptodate')updHint.textContent='Ya tienes la última versión ✅';
+    else if(d.state==='uptodate')updHint.textContent=verTxt+'Ya tienes la última versión ✅';
     else if(d.state==='ready'){ updHint.textContent='Actualización lista'+(d.version?(' (v'+d.version+')'):'')+'. Pulsa reiniciar.'; if(updRestart)updRestart.style.display=''; }
     else if(d.state==='installing'){ updHint.textContent='Instalando… la app se reiniciará sola.'; if(updRestart){updRestart.textContent='Instalando…';updRestart.disabled=true;} }
     else if(d.state==='error')updHint.textContent='No se pudo comprobar ahora, inténtalo más tarde.';
