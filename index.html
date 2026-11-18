@@ -1146,20 +1146,18 @@ function fitWidget(){
   const el=host.querySelector('.widget');if(!el)return;
   // Medir el tamaño natural SIN zoom (offsetWidth/Height son fiables; getBoundingClientRect
   // con zoom puesto puede devolver un tamaño erróneo y hacer que el widget se pase de la ventana).
-  el.style.zoom='';
   el.style.transform='none';
-  const w=el.offsetWidth, h=el.offsetHeight;   // tamaño natural; transform NO afecta al layout, así que es fiable
-  if(!w||!h)return;
-  // Escalar con transform:scale (a prueba de recortes): la caja de layout sigue siendo w×h,
-  // centrada, y se escala visualmente. Como s*w<=ventana y s*h<=ventana, nunca se sale.
-  const SH=36;
+  el.style.zoom='';
+  // Tamaño mínimo FIJO por estilo: si la medición del DOM subestima (lo que hacía que el
+  // widget se agrandara de más y se saliera), este suelo lo impide. Siempre >= tamaño real.
+  const FLOOR={card:{w:410,h:560}, bar:{w:450,h:100}, vinyl:{w:372,h:452}, hero:{w:424,h:566}}[state.style] || {w:410,h:560};
+  const w=Math.max(el.offsetWidth||0, FLOOR.w);
+  const h=Math.max(el.offsetHeight||0, el.scrollHeight||0, FLOOR.h);
+  const SH=18;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
-  s=Math.max(0.35, Math.min(3, s*0.98));
+  s=Math.max(0.3, Math.min(3, s));
   el.style.transformOrigin='center center';
-  el.style.transform='scale('+s+')';
-  if(!fitWidget._reported && window.vibe && window.vibe.reportAspect){
-    fitWidget._reported=true; try{ window.vibe.reportAspect(w/h); }catch(e){}
-  }
+  el.style.zoom=s;   // nítido (y como s se calcula con el tamaño real o mayor, nunca recorta)
 }
 window.addEventListener('resize',fitWidget);
 
