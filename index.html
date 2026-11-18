@@ -55,20 +55,20 @@
   body.w-lyrics .lyrics-body{max-height:none;height:calc(100vh - 48px)}
   /* ---- Barrita superior del widget (aparece al pasar el ratón) ---- */
   #wtool{display:none}
-  body.widgetmode #wtool{display:flex;align-items:center;gap:6px;position:fixed;top:0;left:0;right:0;
-     height:28px;padding:0 6px 0 8px;z-index:400;opacity:0;transform:translateY(-6px);transition:.14s;
+  body.widgetmode #wtool{display:flex;align-items:center;gap:4px;position:fixed;top:0;left:0;right:0;
+     height:26px;padding:0 7px;z-index:400;opacity:0;transform:translateY(-6px);transition:.14s;
      background:linear-gradient(180deg,rgba(8,8,13,.95),rgba(8,8,13,.5) 65%,transparent);
-     -webkit-app-region:no-drag}
+     -webkit-app-region:no-drag;box-sizing:border-box}
   body.widgetmode:hover #wtool{opacity:1;transform:translateY(0)}
-  #wtool .wt-grip{-webkit-app-region:drag;cursor:move;display:flex;align-items:center;gap:6px;
-     font-size:11px;font-weight:700;letter-spacing:.4px;color:rgba(255,255,255,.82);
-     padding:4px 9px;border-radius:7px}
+  #wtool .wt-grip{-webkit-app-region:drag;cursor:move;flex:0 0 auto;display:flex;align-items:center;
+     color:rgba(255,255,255,.75);padding:3px 6px;border-radius:6px}
   #wtool .wt-grip:hover{background:rgba(255,255,255,.12);color:#fff}
-  #wtool .wt-grip .dot{letter-spacing:2px;opacity:.7}
-  #wtool .wt-spacer{flex:1;-webkit-app-region:drag;align-self:stretch;cursor:move}
-  #wtool button{-webkit-app-region:no-drag;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
-     color:#fff;border-radius:7px;font-size:12px;font-weight:700;padding:3px 9px;cursor:pointer;line-height:1}
-  #wtool button:hover{background:rgba(255,255,255,.24)}
+  #wtool .wt-grip .dot{letter-spacing:2px;font-size:12px}
+  #wtool .wt-spacer{flex:1 1 auto;min-width:6px;-webkit-app-region:drag;align-self:stretch;cursor:move}
+  #wtool button{-webkit-app-region:no-drag;flex:0 0 auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);
+     color:#fff;border-radius:6px;font-size:12px;font-weight:700;padding:2px 7px;cursor:pointer;line-height:1.1;min-width:24px}
+  #wtool button:hover{background:rgba(255,255,255,.26)}
+  #wtool #wtClose:hover{background:#e3405f;border-color:#e3405f}
   #wtool #wtLock.on{background:var(--accent);border-color:var(--accent);color:#05130a}
   /* Arrastrar desde cualquier parte mientras NO esté bloqueado... */
   body.widgetmode:not(.wfixed) .widget,
@@ -169,7 +169,8 @@
   /* Hero style */
   .w-hero{width:420px;max-width:100%;aspect-ratio:9/12;border-radius:24px;overflow:hidden;position:relative;
      display:flex;flex-direction:column;justify-content:flex-end;box-shadow:0 30px 60px rgba(0,0,0,.55)}
-  .w-hero .bgcover{position:absolute;inset:0;background-size:cover;background-position:center;filter:saturate(1.1)}
+  .w-hero .bgfill{position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(26px) saturate(1.3) brightness(.5);transform:scale(1.15)}
+  .w-hero .bgcover{position:absolute;inset:0;background-size:contain;background-repeat:no-repeat;background-position:center top;filter:saturate(1.05)}
   .w-hero .veil{position:absolute;inset:0;background:linear-gradient(0deg,rgba(0,0,0,.9) 5%,rgba(0,0,0,.1) 60%)}
   .w-hero .inner{position:relative;padding:26px}
   .w-hero .title{font-size:26px;font-weight:900;letter-spacing:-.6px;line-height:1.05}
@@ -272,12 +273,12 @@
 </head>
 <body>
 <div id="wtool">
-  <span class="wt-grip" title="Arrastra para mover el widget"><span class="dot">⠿</span> Vibe</span>
-  <span class="wt-spacer"></span>
+  <span class="wt-grip" title="Arrastra para mover el widget"><span class="dot">⠿</span></span>
   <button id="wtMinus" title="Más pequeño">−</button>
   <button id="wtPlus" title="Más grande">+</button>
-  <button id="wtMin" title="Minimizar" style="display:none">▁</button>
+  <span class="wt-spacer"></span>
   <button id="wtLock" title="Bloquear posición">🔓</button>
+  <button id="wtMin" title="Minimizar" style="display:none">▁</button>
   <button id="wtClose" title="Cerrar este widget">✕</button>
 </div>
 <div id="dragbar">
@@ -285,6 +286,7 @@
   <span id="dbHint" style="opacity:.6">· fijo</span>
   <span class="db-spacer"></span>
   <button id="dbDrag" title="Activar o desactivar el modo mover">🔒 Mover</button>
+  <button id="dbMin" title="Minimizar" style="display:none">▁</button>
   <button id="dbClose" title="Cerrar (se puede reabrir desde la bandeja)">✕</button>
 </div>
 <div class="wrap">
@@ -601,6 +603,7 @@ function render(){
     }
     else if(state.style==='hero'){
       html=`<div class="widget w-hero ${paused}" style="--w-accent:${accent};${round}">
+        <div class="bgfill" style="background-image:url('${state.cover}')"></div>
         <div class="bgcover" style="background-image:url('${state.cover}')"></div>
         <div class="veil"></div>
         <div class="inner">
@@ -1207,6 +1210,8 @@ if(navigator.userAgent.includes('Electron')){
   };
   const close=document.getElementById('dbClose');
   if(close)close.onclick=()=>{try{window.close();}catch(e){}};
+  const dbMin=document.getElementById('dbMin');
+  if(dbMin && window.vibe && window.vibe.minimizeSelf){ dbMin.style.display=''; dbMin.onclick=()=>window.vibe.minimizeSelf(); }
 }
 
 // ---------- puente de escritorio (solo en el panel de control) ----------
@@ -1222,6 +1227,7 @@ if(window.vibe && !WIDGET){
     else if(d.state==='downloading')updHint.textContent='Descargando'+(d.percent!=null?(' '+d.percent+'%'):'')+'…';
     else if(d.state==='uptodate')updHint.textContent='Ya tienes la última versión ✅';
     else if(d.state==='ready'){ updHint.textContent='Actualización lista'+(d.version?(' (v'+d.version+')'):'')+'. Pulsa reiniciar.'; if(updRestart)updRestart.style.display=''; }
+    else if(d.state==='installing'){ updHint.textContent='Instalando… la app se reiniciará sola.'; if(updRestart){updRestart.textContent='Instalando…';updRestart.disabled=true;} }
     else if(d.state==='error')updHint.textContent='No se pudo comprobar ahora, inténtalo más tarde.';
     else if(d.state==='unsupported')updHint.textContent='Actualización automática no disponible.';
   });
