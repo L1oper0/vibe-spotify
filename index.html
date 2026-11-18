@@ -125,14 +125,9 @@
   .widget{position:relative;color:#fff;--w-accent:#1db954}
   .cover{background-size:cover;background-position:center;position:relative}
   .marq{overflow:hidden;white-space:nowrap}
-  .bars{display:flex;gap:3px;align-items:flex-end;height:16px}
-  .bars span{width:3px;background:var(--w-accent);border-radius:2px;animation:eq .9s ease-in-out infinite}
-  .bars span:nth-child(2){animation-delay:.15s}
-  .bars span:nth-child(3){animation-delay:.3s}
-  .bars span:nth-child(4){animation-delay:.45s}
-  .bars span:nth-child(5){animation-delay:.6s}
-  @keyframes eq{0%,100%{height:5px}50%{height:16px}}
-  .paused .bars span{animation-play-state:paused}
+  .bars{display:flex;gap:3px;align-items:flex-end;height:18px}
+  .bars span{width:3px;height:5px;border-radius:2px;transition:height .08s linear;
+     background:linear-gradient(to top, var(--w-accent), color-mix(in srgb, var(--w-accent) 55%, #fff))}
   .prog{height:4px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;cursor:pointer}
   .prog > i{display:block;height:100%;background:var(--w-accent);border-radius:99px;width:38%}
   .times{display:flex;justify-content:space-between;width:100%;font-size:11px;color:rgba(255,255,255,.7);margin-top:6px}
@@ -156,14 +151,17 @@
   /* Vinyl style */
   .w-vinyl{width:360px;border-radius:22px;padding:26px;display:flex;flex-direction:column;align-items:center;
      backdrop-filter:blur(8px);box-shadow:0 30px 60px rgba(0,0,0,.5)}
-  .disc{width:200px;height:200px;border-radius:50%;position:relative;
-     background:radial-gradient(circle at 50% 50%, #111 0 28%, #222 29% 30%, #111 31% 100%);
-     display:grid;place-items:center;animation:spin 6s linear infinite}
-  .paused .disc{animation-play-state:paused}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .disc .cover{width:112px;height:112px;border-radius:50%;border:4px solid #000}
-  .disc::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:#000;
-     box-shadow:0 0 0 3px #333}
+  .disc{width:200px;height:200px;border-radius:50%;position:relative;display:grid;place-items:center;
+     box-shadow:0 10px 26px rgba(0,0,0,.55)}
+  .disc::before{content:"";position:absolute;inset:0;border-radius:50%;z-index:2;pointer-events:none;
+     background:linear-gradient(125deg, rgba(255,255,255,.16) 0 30%, transparent 46% 62%, rgba(255,255,255,.07) 100%)}
+  .platter{width:100%;height:100%;border-radius:50%;position:relative;display:grid;place-items:center;will-change:transform;
+     background:
+       repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.045) 0 1px, transparent 1px 3.5px),
+       radial-gradient(circle at 50% 50%, #1b1b20 0 55%, #0b0b0e 55% 100%)}
+  .platter .cover{width:108px;height:108px;border-radius:50%;border:5px solid #0a0a0a;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+  .platter::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:#0a0a0a;
+     box-shadow:0 0 0 3px rgba(255,255,255,.14);z-index:1}
   .w-vinyl .title{font-size:18px;font-weight:800;margin-top:20px;text-align:center}
   .w-vinyl .artist{color:rgba(255,255,255,.72);font-size:13px;text-align:center;margin-top:2px}
   .w-vinyl .prog{width:100%;margin-top:16px}
@@ -278,6 +276,7 @@
   <span class="wt-spacer"></span>
   <button id="wtMinus" title="Más pequeño">−</button>
   <button id="wtPlus" title="Más grande">+</button>
+  <button id="wtMin" title="Minimizar" style="display:none">▁</button>
   <button id="wtLock" title="Bloquear posición">🔓</button>
   <button id="wtClose" title="Cerrar este widget">✕</button>
 </div>
@@ -593,7 +592,7 @@ function render(){
     }
     else if(state.style==='vinyl'){
       html=`<div class="widget w-vinyl ${paused}" style="--w-accent:${accent};${bgStyle};${round}">
-        <div class="disc"><div class="cover" style="background-image:url('${state.cover}')"></div></div>
+        <div class="disc"><div class="platter"><div class="cover" style="background-image:url('${state.cover}')"></div></div></div>
         <div class="title">${esc(state.title)}</div>
         <div class="artist">${esc(state.artist)}</div>
         ${prog}
@@ -781,6 +780,53 @@ function highlightLyrics(force){
 
 // ---------- master ticker ----------
 setInterval(()=>{updateProgressInPlace();highlightLyrics(false);},250);
+
+// ---------- motor de animación (vinilo fluido + ecualizador) ----------
+let _spinAngle=0, _animLast=0;
+const EQ_N=5;
+let _eqLevels=new Array(EQ_N).fill(0.3), _eqTarget=new Array(EQ_N).fill(0.3), _eqNext=0;
+let _analysis=null, _analysisTrack=null;
+function segAt(posSec){
+  if(!_analysis||!_analysis.segments||!_analysis.segments.length)return null;
+  const s=_analysis.segments; let lo=0,hi=s.length-1,ans=s[0];
+  while(lo<=hi){ const m=(lo+hi)>>1; if(s[m].start<=posSec){ans=s[m];lo=m+1;} else hi=m-1; }
+  return ans;
+}
+async function ensureAnalysis(){
+  if(!state.live){ _analysis=null; _analysisTrack=null; return; }
+  const id=state.trackSpotifyId; if(!id||_analysisTrack===id)return;
+  const t=await token(); if(!t)return;
+  try{
+    const r=await fetch('https://api.spotify.com/v1/audio-analysis/'+id,{headers:{Authorization:'Bearer '+t}});
+    _analysisTrack=id;
+    _analysis=r.ok ? await r.json() : null; // si 403/no disponible -> respaldo simulado
+  }catch(e){ _analysisTrack=id; _analysis=null; }
+}
+function updateEq(ts){
+  if(!state.playing){ for(let i=0;i<EQ_N;i++)_eqLevels[i]+=(0.12-_eqLevels[i])*0.12; return; }
+  if(_analysis){ // ecualizador REAL: sigue el análisis de la canción
+    const seg=segAt(effPos()/1000);
+    if(seg&&seg.pitches){
+      const loud=seg.loudness_max!=null?seg.loudness_max:-20;
+      const energy=Math.max(0,Math.min(1,(loud+40)/40));
+      for(let i=0;i<EQ_N;i++){ const p=seg.pitches[Math.floor(i*12/EQ_N)]||0; _eqTarget[i]=(0.12+0.88*p)*(0.45+0.55*energy); }
+    }
+  } else { // respaldo: movimiento suave y musical, no barras aleatorias constantes
+    if(ts>_eqNext){ _eqNext=ts+110; for(let i=0;i<EQ_N;i++)_eqTarget[i]=0.2+Math.random()*0.8; }
+  }
+  for(let i=0;i<EQ_N;i++)_eqLevels[i]+=(_eqTarget[i]-_eqLevels[i])*0.28;
+}
+function animLoop(ts){
+  const dt=_animLast?Math.min(80,ts-_animLast):16; _animLast=ts;
+  if(state.playing)_spinAngle=(_spinAngle+dt*0.045)%360; // ~8s por vuelta, continuo
+  const platter=host.querySelector('.platter');
+  if(platter)platter.style.transform='rotate('+_spinAngle+'deg)';
+  updateEq(ts);
+  const bars=host.querySelectorAll('.bars span');
+  if(bars.length)for(let i=0;i<bars.length;i++)bars[i].style.height=(4+_eqLevels[i%EQ_N]*14).toFixed(1)+'px';
+  requestAnimationFrame(animLoop);
+}
+requestAnimationFrame(animLoop);
 
 // ---------- controls wiring ----------
 document.getElementById('styleGrid').addEventListener('click',e=>{
@@ -1040,6 +1086,7 @@ async function poll(){
     if(d&&d.item){
       const newTrack=(d.item.name+'|'+(d.item.artists||[]).map(a=>a.name).join(','))!==state._trackId;
       state._trackId=d.item.name+'|'+(d.item.artists||[]).map(a=>a.name).join(',');
+      state.trackSpotifyId=d.item.id||null;
       state.title=d.item.name;
       state.artist=(d.item.artists||[]).map(a=>a.name).join(', ');
       const img=d.item.album&&d.item.album.images&&d.item.album.images[0];
@@ -1050,7 +1097,7 @@ async function poll(){
       playBtn.textContent=state.playing?'⏸ Pausa':'▶ Play';
       stageLabel.textContent='En vivo · Spotify';
       render();
-      if(newTrack)fetchLyrics();
+      if(newTrack){ fetchLyrics(); ensureAnalysis(); }
     }
   }catch(e){}
 }
@@ -1130,6 +1177,8 @@ function applyWidgetMode(){
   const wtMinus=document.getElementById('wtMinus'), wtPlus=document.getElementById('wtPlus');
   if(wtMinus)wtMinus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(0.85); };
   if(wtPlus)wtPlus.onclick=()=>{ if(window.vibe&&window.vibe.resizeWidget)window.vibe.resizeWidget(1.18); };
+  const wtMin=document.getElementById('wtMin');
+  if(wtMin && window.vibe && window.vibe.minimizeSelf){ wtMin.style.display=''; wtMin.onclick=()=>window.vibe.minimizeSelf(); }
   if(bc)bc.onmessage=(e)=>{ if(e.data&&e.data.k==='settings'){ applySettings(e.data.v); render(); highlightLyrics(true); } };
   // comprobación periódica de ajustes y de conexión (respaldo del evento storage)
   let lastW=localStorage.getItem('vibe_settings')||'';
