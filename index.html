@@ -1146,19 +1146,25 @@ function fitWidget(){
   const el=host.querySelector('.widget');if(!el)return;
   // Medir el tamaño natural SIN zoom (offsetWidth/Height son fiables; getBoundingClientRect
   // con zoom puesto puede devolver un tamaño erróneo y hacer que el widget se pase de la ventana).
+  // Medir el tamaño natural en flujo normal (sin posición fija ni transform)
+  el.style.position='static';
   el.style.transform='none';
   el.style.zoom='';
-  // Tamaño mínimo FIJO por estilo: si la medición del DOM subestima (lo que hacía que el
-  // widget se agrandara de más y se saliera), este suelo lo impide. Siempre >= tamaño real.
+  // Tamaño mínimo FIJO por estilo: evita que una medición baja escale de más y se salga.
   const FLOOR={card:{w:410,h:560}, bar:{w:450,h:100}, vinyl:{w:372,h:452}, hero:{w:424,h:566}}[state.style] || {w:410,h:560};
   const w=Math.max(el.offsetWidth||0, FLOOR.w);
   const h=Math.max(el.offsetHeight||0, el.scrollHeight||0, FLOOR.h);
   const SH=24;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
   s=Math.max(0.3, Math.min(3, s*0.92));   // margen de seguridad
-  // transform:scale (no zoom): escala desde el centro real → simétrico, sin el fallo de centrado de zoom.
+  // Anclar al CENTRO de la ventana con posición fija y escalar desde ahí.
+  // Así el widget queda SIEMPRE centrado aunque su caja natural sea mayor que la ventana
+  // (lo que arreglaba el desvío a un lado al agrandar/empequeñecer).
+  el.style.position='fixed';
+  el.style.left='50%';
+  el.style.top='50%';
   el.style.transformOrigin='center center';
-  el.style.transform='scale('+s+')';
+  el.style.transform='translate(-50%,-50%) scale('+s+')';
 }
 window.addEventListener('resize',fitWidget);
 
