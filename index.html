@@ -136,8 +136,8 @@
   .w-card{width:360px;border-radius:22px;padding:22px;backdrop-filter:blur(8px);
      box-shadow:0 30px 60px rgba(0,0,0,.5)}
   .w-card .cover{width:100%;aspect-ratio:1;border-radius:14px;margin-bottom:16px}
-  .w-card .title{font-size:20px;font-weight:800;letter-spacing:-.3px}
-  .w-card .artist{color:rgba(255,255,255,.72);font-size:14px;margin-top:2px}
+  .w-card .title{font-size:20px;font-weight:800;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .w-card .artist{color:rgba(255,255,255,.72);font-size:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .w-card .row{display:flex;align-items:center;gap:12px;margin-top:14px}
 
   /* Bar style */
@@ -572,8 +572,8 @@ function render(){
     if(state.style==='card'){
       html=`<div class="widget w-card ${paused}" style="--w-accent:${accent};${bgStyle};${round}">
         <div class="cover" style="background-image:url('${state.cover}');${round}"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div class="title">${esc(state.title)}</div><div class="artist">${esc(state.artist)}</div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="min-width:0;flex:1"><div class="title">${esc(state.title)}</div><div class="artist">${esc(state.artist)}</div></div>
           ${eq}
         </div>
         ${prog?`<div style="margin-top:14px">${prog}</div>`:''}
@@ -1153,9 +1153,9 @@ function fitWidget(){
   const FLOOR={card:{w:410,h:560}, bar:{w:450,h:100}, vinyl:{w:372,h:452}, hero:{w:424,h:566}}[state.style] || {w:410,h:560};
   const w=Math.max(el.offsetWidth||0, FLOOR.w);
   const h=Math.max(el.offsetHeight||0, el.scrollHeight||0, FLOOR.h);
-  const SH=18;
+  const SH=24;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
-  s=Math.max(0.3, Math.min(3, s));
+  s=Math.max(0.3, Math.min(3, s*0.9));   // 0.9 = margen de seguridad, nunca pega al borde
   el.style.transformOrigin='center center';
   el.style.zoom=s;   // nítido (y como s se calcula con el tamaño real o mayor, nunca recorta)
 }
