@@ -1144,18 +1144,19 @@ function startPolling(){
 function fitWidget(){
   if(!WIDGET || WIDGET==='lyrics')return;
   const el=host.querySelector('.widget');if(!el)return;
-  // medir el tamaño natural del widget para ajustarlo sin hueco y sin pixelar
-  el.style.transform='none'; el.style.zoom='1';
-  const r=el.getBoundingClientRect();
-  if(!r.width||!r.height)return;
-  // SH reserva espacio para la sombra; al ir DENTRO de la división, crece con el zoom
-  // y así la sombra nunca se recorta por grande que se haga el widget.
-  const SH=46;
-  const s=Math.max(0.4, Math.min(3, Math.min(window.innerWidth/(r.width+SH), window.innerHeight/(r.height+SH))));
+  // Medir el tamaño natural SIN zoom (offsetWidth/Height son fiables; getBoundingClientRect
+  // con zoom puesto puede devolver un tamaño erróneo y hacer que el widget se pase de la ventana).
+  el.style.transform='none';
+  el.style.zoom='';
+  const w=el.offsetWidth, h=el.offsetHeight;   // fuerza reflujo y da el tamaño real sin zoom
+  if(!w||!h)return;
+  // SH reserva sitio para la sombra (va dentro de la división, así escala con el zoom).
+  const SH=40;
+  let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
+  s=Math.max(0.4, Math.min(3, s*0.98));        // 0.98 = pequeño margen anti-recorte
   el.style.zoom=s;
-  // informar de la proporción natural (una vez) para que la ventana no deje huecos
   if(!fitWidget._reported && window.vibe && window.vibe.reportAspect){
-    fitWidget._reported=true; try{ window.vibe.reportAspect(r.width/r.height); }catch(e){}
+    fitWidget._reported=true; try{ window.vibe.reportAspect(w/h); }catch(e){}
   }
 }
 window.addEventListener('resize',fitWidget);
