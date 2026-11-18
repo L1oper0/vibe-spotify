@@ -81,6 +81,24 @@
   body.widgetmode .widget{box-shadow:0 4px 14px rgba(0,0,0,.4) !important}
   body.widgetmode .w-card, body.widgetmode .w-vinyl,
   body.widgetmode .w-bar, body.widgetmode .w-hero{border:1px solid rgba(255,255,255,.1)}
+  /* ---- Tarjeta FLUIDA: llena la ventana (menos un margen para la sombra), todo en
+     proporción (cqw = 1% del ancho de la tarjeta). No se escala: siempre completa y centrada. ---- */
+  body.widgetmode .w-card{
+    position:fixed; inset:8px; width:auto; height:auto; box-sizing:border-box;
+    display:flex; flex-direction:column; justify-content:center;
+    container-type:size; padding:5.5cqw; border-radius:6cqw}
+  body.widgetmode .w-card .cover{width:100%; flex:1 1 auto; min-height:0; aspect-ratio:auto;
+    margin-bottom:4cqw; border-radius:4cqw}
+  body.widgetmode .w-card .title{font-size:6.4cqw; line-height:1.12}
+  body.widgetmode .w-card .artist{font-size:4.2cqw; margin-top:.6cqw}
+  body.widgetmode .w-card .bars{height:5cqw; gap:.8cqw}
+  body.widgetmode .w-card .bars span{width:1.1cqw}
+  body.widgetmode .w-card .prog{height:1cqw}
+  body.widgetmode .w-card .times{font-size:3cqw; margin-top:1.4cqw}
+  body.widgetmode .w-card .row{margin-top:3.5cqw !important; gap:4cqw}
+  body.widgetmode .w-card .ico{width:12cqw; height:12cqw}
+  body.widgetmode .w-card .ico svg{width:45%; height:45%}
+  body.widgetmode .w-card > div[style*="margin-top:14px"]{margin-top:3.5cqw !important}
   body::before{content:"";position:fixed;inset:0;background:
      radial-gradient(60vw 60vw at 15% -10%, rgba(29,185,84,.14), transparent 60%),
      radial-gradient(50vw 50vw at 110% 10%, rgba(120,80,255,.12), transparent 60%);
@@ -826,7 +844,7 @@ function animLoop(ts){
   if(platter)platter.style.transform='rotate('+_spinAngle+'deg)';
   updateEq(ts);
   const bars=host.querySelectorAll('.bars span');
-  if(bars.length)for(let i=0;i<bars.length;i++)bars[i].style.height=(4+_eqLevels[i%EQ_N]*14).toFixed(1)+'px';
+  if(bars.length)for(let i=0;i<bars.length;i++)bars[i].style.height=(12+_eqLevels[i%EQ_N]*88).toFixed(1)+'%';
   requestAnimationFrame(animLoop);
 }
 requestAnimationFrame(animLoop);
@@ -1143,6 +1161,8 @@ function startPolling(){
 // ---------- escalar el widget al tamaño de la ventana (nítido, con zoom) ----------
 function fitWidget(){
   if(!WIDGET || WIDGET==='lyrics')return;
+  // La tarjeta es FLUIDA (se ajusta sola por CSS): no la escalamos.
+  if(state.style==='card')return;
   const el=host.querySelector('.widget');if(!el)return;
   // Medir el tamaño natural SIN zoom (offsetWidth/Height son fiables; getBoundingClientRect
   // con zoom puesto puede devolver un tamaño erróneo y hacer que el widget se pase de la ventana).
