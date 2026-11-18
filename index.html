@@ -1155,9 +1155,10 @@ function fitWidget(){
   const h=Math.max(el.offsetHeight||0, el.scrollHeight||0, FLOOR.h);
   const SH=24;
   let s=Math.min(window.innerWidth/(w+SH), window.innerHeight/(h+SH));
-  s=Math.max(0.3, Math.min(3, s*0.9));   // 0.9 = margen de seguridad, nunca pega al borde
+  s=Math.max(0.3, Math.min(3, s*0.92));   // margen de seguridad
+  // transform:scale (no zoom): escala desde el centro real → simétrico, sin el fallo de centrado de zoom.
   el.style.transformOrigin='center center';
-  el.style.zoom=s;   // nítido (y como s se calcula con el tamaño real o mayor, nunca recorta)
+  el.style.transform='scale('+s+')';
 }
 window.addEventListener('resize',fitWidget);
 
